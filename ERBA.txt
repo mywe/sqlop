@@ -1,0 +1,3 @@
+table_name:a_l_cell_ERAB_TIME_d
+NbrAttEstab:C373505472,C373505480
+NbrSuccEstab:C373505473,C373505481
