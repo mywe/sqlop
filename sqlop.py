@@ -1,9 +1,29 @@
 import os
+import sys
 import cx_Oracle
 import datetime
 import xlrd
 
-db = cx_Oracle.connect('user', 'key', 'ip')
+def getDBSetting():
+	set = dict()
+	with open('oracle_setting', 'r') as ff:
+		for line in ff.readlines():
+			line = line.replace('\r', '')
+			line = line.replace('\n', '')
+			info = line.split(':')
+			set[info[0]] = info[1]
+		ff.close()
+	return set
+
+dbSetting = getDBSetting()
+print(dbSetting)
+
+#try:
+db = cx_Oracle.connect(dbSetting['user'], dbSetting['pwd'], '%s:%s/%s'%(dbSetting['host'], dbSetting['port'], dbSetting['dbName']))
+#except:
+#	print('wrong setting of database!')
+#	sys.exit()
+
 print(db.version)
 cursor = db.cursor()
 curTime = datetime.datetime.today() + datetime.timedelta(-1)
@@ -23,6 +43,8 @@ for r in range(1, sheet.nrows):
 	except:
 		continue
 	print(eNodeB_Id, cell_Id)
+	startT = startTime.strftime('%Y-%m-%d %H:%M:%S')
+	endT = endTime.strftime('%Y-%m-%d %H:%M:%S')
 	with open('cqi_table_name.txt', 'r') as tbf:
 		for tbn in tbf.readlines():
 			tbn = tbn.replace('\n', '')
@@ -39,19 +61,82 @@ for r in range(1, sheet.nrows):
 			sqlStr = 'select %s from MINOS_PM.%s\
 			where CELLID=%d and MEID=%d and\
 			BEGINTIME between to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\') and to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\')'\
-			%(fields, tbn, cell_Id, eNodeB_Id, startTime.strftime('%Y-%m-%d %H:%M:%S'), endTime.strftime('%Y-%m-%d %H:%M:%S'))
-			print(sqlStr)
+			%(fields, tbn, cell_Id, eNodeB_Id, startT, endT)
 			cursor.execute(sqlStr)
 			rows = cursor.fetchall()
 			
 			if len(rows) == 0:
 				continue
 			with open('%s_CQI.txt'%(tbn), 'a') as ff:
-				for row in rows:
-					n = len(row)
+				total = list(rows[0])
+				nRow = len(rows)
+				n = len(total)
+				for r in range(1, nRow):
 					for i in range(n):
-						ff.write('%s'%((',' + str(row[i])) if i != 0 else str(row[i])))
-					ff.write('\n')
+						total[i] += rows[r][i]
+				for i in range(n):
+					ff.write('%s'%((',' + str(total[i])) if i != 0 else str(total[i])))
+				ff.write('\n')
 				ff.close()
 			break
 		tbf.close()
+	
+	with open('ERBA.txt', 'r') as ff:
+		infos = dict()
+		for line in ff.readlines():
+			line = line.replace('\r', '')
+			line = line.replace('\n', '')
+			info = line.split(':')
+			infos[info[0]] = info[1]
+		
+		sqlStr = 'select %s, %s from MINOS_PM.%s\
+					where CELLID=%d and MEID=%d and\
+					BEGINTIME between to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\') and to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\')'\
+					%(infos['NbrSuccEstab'], infos['NbrAttEstab'], infos['table_name'], cell_Id, eNodeB_Id, startT, endT)
+		cursor.execute(sqlStr)
+		rows = cursor.fetchall()
+		
+		if len(rows) != 0:
+			with open('%s_res.txt'%(infos['table_name']), 'a') as resff:
+				total = list(rows[0])
+				nRow = len(rows)
+				n = len(total)
+				for r in range(1, nRow):
+					for i in range(n):
+						total[i] += rows[r][i]
+				for i in range(n):
+					resff.write('%s'%((',' + str(total[i])) if i != 0 else str(total[i])))
+				resff.write('\n')
+				resff.close()
+		
+		ff.close()
+		
+	with open('rrc_connect.txt', 'r') as ff:
+		infos = dict()
+		for line in ff.readlines():
+			line = line.replace('\r', '')
+			line = line.replace('\n', '')
+			info = line.split(':')
+			infos[info[0]] = info[1]
+		
+		sqlStr = 'select %s, %s from MINOS_PM.%s\
+					where CELLID=%d and MEID=%d and\
+					BEGINTIME between to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\') and to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\')'\
+					%(infos['SuccConnEstab'], infos['AttConnEstab'], infos['table_name'], cell_Id, eNodeB_Id, startT, endT)
+		cursor.execute(sqlStr)
+		rows = cursor.fetchall()
+		
+		if len(rows) != 0:
+			with open('%s_res.txt'%(infos['table_name']), 'a') as resff:
+				total = list(rows[0])
+				nRow = len(rows)
+				n = len(total)
+				for r in range(1, nRow):
+					for i in range(n):
+						total[i] += rows[r][i]
+				for i in range(n):
+					resff.write('%s'%((',' + str(total[i])) if i != 0 else str(total[i])))
+				resff.write('\n')
+				resff.close()
+		
+		ff.close()
