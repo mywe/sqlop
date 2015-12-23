@@ -15,20 +15,33 @@ def getDBSetting():
 		ff.close()
 	return set
 
-dbSetting = getDBSetting()
-print(dbSetting)
+def writeFields(fileName, fields):
+	with open(fileName, 'w') as ff:
+		ff.write('%s\n'%fields)
+		ff.close()
 
-#try:
-db = cx_Oracle.connect(dbSetting['user'], dbSetting['pwd'], '%s:%s/%s'%(dbSetting['host'], dbSetting['port'], dbSetting['dbName']))
-#except:
-#	print('wrong setting of database!')
-#	sys.exit()
-
-print(db.version)
-cursor = db.cursor()
 curTime = datetime.datetime.today() + datetime.timedelta(-1)
 startTime = datetime.datetime(curTime.year, curTime.month, curTime.day)
 endTime = datetime.datetime(curTime.year, curTime.month, curTime.day, 23, 59, 59)
+CQI_fstr = startTime.strftime('%Y-%m-%d') + "_CQI.txt"
+ERBA_fstr = startTime.strftime('%Y-%m-%d') + "_ERBA.txt"
+rcc_fstr = startTime.strftime('%Y-%m-%d') + "_RCC.txt"
+
+writeFields(CQI_fstr, 'BEGINTIME,MEID,CELLID,CQI0,CQI1,CQI2,CQI3,CQI4,CQI5,CQI6,CQI7,CQI8,CQI9,CQI10,CQI11,CQI12,CQI13,CQI14,CQI15')
+writeFields(ERBA_fstr, 'BEGINTIME,MEID,CELLID,succEstab1,succEstab2,attEstab1,attEstab2')
+writeFields(rcc_fstr, 'BEGINTIME,MEID,CELLID,succEstab1,succEstab2,succEstab3,succEstab4,succEstab5,succEstab6,attEstab1,attEstab2,attEstab3,attEstab4,attEstab5,attEstab6')
+
+dbSetting = getDBSetting()
+print(dbSetting)
+
+try:
+	db = cx_Oracle.connect(dbSetting['user'], dbSetting['pwd'], '%s:%s/%s'%(dbSetting['host'], dbSetting['port'], dbSetting['dbName']))
+except:
+	print('wrong setting of database!')
+	sys.exit()
+
+print(db.version)
+cursor = db.cursor()
 workbook = xlrd.open_workbook('佛山无线中心LTE工参-20151203.xlsx')
 sheet = workbook.sheets()[1]
 
@@ -67,13 +80,14 @@ for r in range(1, sheet.nrows):
 			
 			if len(rows) == 0:
 				continue
-			with open('%s_CQI.txt'%(tbn), 'a') as ff:
+			with open(CQI_fstr, 'a') as ff:
 				total = list(rows[0])
 				nRow = len(rows)
 				n = len(total)
 				for r in range(1, nRow):
 					for i in range(n):
-						total[i] += rows[r][i]
+						if i > 2:
+							total[i] += rows[r][i]
 				for i in range(n):
 					ff.write('%s'%((',' + str(total[i])) if i != 0 else str(total[i])))
 				ff.write('\n')
@@ -89,7 +103,7 @@ for r in range(1, sheet.nrows):
 			info = line.split(':')
 			infos[info[0]] = info[1]
 		
-		sqlStr = 'select %s, %s from MINOS_PM.%s\
+		sqlStr = 'select BEGINTIME,MEID,CELLID,%s,%s from MINOS_PM.%s\
 					where CELLID=%d and MEID=%d and\
 					BEGINTIME between to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\') and to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\')'\
 					%(infos['NbrSuccEstab'], infos['NbrAttEstab'], infos['table_name'], cell_Id, eNodeB_Id, startT, endT)
@@ -97,13 +111,14 @@ for r in range(1, sheet.nrows):
 		rows = cursor.fetchall()
 		
 		if len(rows) != 0:
-			with open('%s_res.txt'%(infos['table_name']), 'a') as resff:
+			with open(ERBA_fstr, 'a') as resff:
 				total = list(rows[0])
 				nRow = len(rows)
 				n = len(total)
 				for r in range(1, nRow):
 					for i in range(n):
-						total[i] += rows[r][i]
+						if i > 2:
+							total[i] += rows[r][i]
 				for i in range(n):
 					resff.write('%s'%((',' + str(total[i])) if i != 0 else str(total[i])))
 				resff.write('\n')
@@ -119,7 +134,7 @@ for r in range(1, sheet.nrows):
 			info = line.split(':')
 			infos[info[0]] = info[1]
 		
-		sqlStr = 'select %s, %s from MINOS_PM.%s\
+		sqlStr = 'select BEGINTIME,MEID,CELLID,%s,%s from MINOS_PM.%s\
 					where CELLID=%d and MEID=%d and\
 					BEGINTIME between to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\') and to_date(\'%s\',\'yyyy-mm-dd hh24:mi:ss\')'\
 					%(infos['SuccConnEstab'], infos['AttConnEstab'], infos['table_name'], cell_Id, eNodeB_Id, startT, endT)
@@ -127,13 +142,14 @@ for r in range(1, sheet.nrows):
 		rows = cursor.fetchall()
 		
 		if len(rows) != 0:
-			with open('%s_res.txt'%(infos['table_name']), 'a') as resff:
+			with open(rcc_fstr, 'a') as resff:
 				total = list(rows[0])
 				nRow = len(rows)
 				n = len(total)
 				for r in range(1, nRow):
 					for i in range(n):
-						total[i] += rows[r][i]
+						if i > 2:
+							total[i] += rows[r][i]
 				for i in range(n):
 					resff.write('%s'%((',' + str(total[i])) if i != 0 else str(total[i])))
 				resff.write('\n')
